@@ -1,10 +1,16 @@
 import * as Bucket from "@spica-devkit/bucket";
 const fetch = require("node-fetch");
-var YAML = require('json2yaml');
+var YAML = require("yaml");
+import * as cp from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 
+const GIT_USERNAME = process.env.GIT_USERNAME;
+const GIT_EMAIL = process.env.GIT_EMAIL;
+const GIT_PASSWORD = process.env.GIT_PASSWORD;
+const GIT_URL = process.env.GIT_URL;
 
 export async function convertAsset(req, res) {
-  const { git_url } = req.query;
   Bucket.initialize({ apikey: `${process.env.API_KEY}` });
   const HOST = req.headers.get("host");
   /////////--------------Get Schemas-----------------////////////
@@ -37,7 +43,7 @@ export async function convertAsset(req, res) {
     allFunctions: allFunctions
   };
 
-  let allYaml = [];
+  let yamlString = "";
   let schemaFindArr = [];
   data.schemas.forEach((s, i) => {
     setUnrealArray(s, i);
@@ -113,7 +119,9 @@ export async function convertAsset(req, res) {
       (i + 1);
     return word;
   }
-  data.schemas.forEach(s => allYaml.push(s));
+  data.schemas.forEach(s => {
+    yamlString += "# BUCKET - " + s.spec.title + "\n" + YAML.stringify(s) + "---\n";
+  });
   let triggers = [];
   let indexes = [];
   data.allFunctions = data.allFunctions.map((f, i) => {
@@ -133,7 +141,7 @@ export async function convertAsset(req, res) {
         language: "Typescript"
       };
     }
-    indexes.push({ function: unrealname, index: f.index });
+    indexes.push({ func: unrealname + ".js", index: f.index });
     delete f.index;
     delete f.memoryLimit;
     f = {
@@ -153,7 +161,7 @@ export async function convertAsset(req, res) {
     delete f.spec._id;
     delete f.spec.name;
     delete f.spec.triggers;
-    allYaml.push(f);
+    yamlString += "# FUNCTION - " + f.spec.title + "\n" + YAML.stringify(f) + "---\n";
     return f;
   });
   //console.log()
@@ -186,17 +194,158 @@ export async function convertAsset(req, res) {
       spec: t
     };
     delete t.spec.options;
-    allYaml.push(t);
-
+    yamlString += "# TRIGGER - " + t.spec.name + "\n" + YAML.stringify(t) + "---\n";
     return t;
   });
-  console.log(allYaml);
-  console.log(indexes)
+  yamlString = yamlString.substring(0, yamlString.length - 7);
+  if (dubRelation) return res.status(400).send({ message: "Cross relation error !" });
 
+  /***********************GIT************************/
 
-  let yamlData = YAML.stringify(allyaml)
-  if (dubRelation) return res.status(400).send({ message: "Dublicate relation error !" })
-  return { yamlData };
+  await run("rm", ["-rf", "tmp/repo"]).catch(e => console.log("e :", e));
+  await installGit();
+
+  cp.execSync(`git config --global http.sslverify false`, {
+    stdio: ["ignore", "ignore", "inherit"]
+  });
+  cp.execSync(`git config --global user.email ${GIT_EMAIL}`, {
+    stdio: ["ignore", "ignore", "inherit"]
+  });
+  cp.execSync(`git config --global user.name ${GIT_USERNAME}`, {
+    stdio: ["ignore", "ignore", "inherit"]
+  });
+
+  cp.exec(`git config --list`, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`git config --list error: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`git config --list stderr: ${stderr}`);
+      return;
+    }
+    console.log(`git config --list stdout:\n${stdout}`);
+  });
+
+  await run("git", ["clone", `${GIT_URL}`, "tmp/repo"])
+    .then(() => { })
+    .catch(error => {
+      console.log("error : ", error);
+      res.status(400).send({
+        message: "Cannot find asset documents",
+        error: error
+      });
+    });
+
+  cp.exec(
+    `git remote set-url origin  https://${GIT_USERNAME}:${GIT_PASSWORD}@` +
+    GIT_URL.split("https://")[1],
+    { cwd: __dirname + "/tmp/repo" },
+    (error, stdout, stderr) => {
+      if (error) {
+        console.error(`git remote set-url error: ${error.message}`);
+        return;
+      }
+      if (stderr) {
+        console.error(`git remote set-url stderr: ${stderr}`);
+        return;
+      }
+      console.log(`git remote set-url stdout:\n${stdout}`);
+    }
+  );
+
+  const yamlPath = path.join("/tmp/repo", "asset.yaml");
+  fs.writeFileSync(__dirname + yamlPath, yamlString);
+  let funcPath;
+  const funcDir = "./tmp/repo/functions";
+  if (indexes.lenght > 0 && !fs.existsSync(funcDir)) {
+    fs.mkdirSync(funcDir);
+  }
+  for (let funcIndex of indexes) {
+    funcPath = path.join("/tmp/repo/functions", funcIndex.func);
+    fs.writeFileSync(__dirname + funcPath, funcIndex.index);
+  }
+
+  cp.exec("git add --all", { cwd: __dirname + "/tmp/repo" }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`git add error: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`git add stderr: ${stderr}`);
+      return;
+    }
+    console.log(`git add stdout:\n${stdout}`);
+  });
+  cp.exec("git commit -m 'dvt-5'", { cwd: __dirname + "/tmp/repo" }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`git commit error: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`git commit stderr: ${stderr}`);
+      return;
+    }
+    console.log(`git commit stdout:\n${stdout}`);
+  });
+  cp.exec(
+    "git push origin --force",
+    { cwd: __dirname + "/tmp/repo" },
+    (error, stdout, stderr) => {
+      if (error) {
+        console.error(`git push error: ${error.message}`);
+        return;
+      }
+      if (stderr) {
+        console.error(`git push stderr: ${stderr}`);
+        return;
+      }
+      console.log(`git push stdout:\n${stdout}`);
+    }
+  );
+  /***********************GIT************************/
+
+  return { yamlString };
+}
+
+async function installGit() {
+  console.log("INSTALLATION GIT START");
+  const script = `
+    apt update -y
+    apt install npm -y
+    apt install git -y`;
+
+  const scriptPath = "/tmp/installDependencies.sh";
+  fs.writeFileSync(scriptPath, script);
+  fs.chmodSync(scriptPath, "755");
+  cp.spawnSync(scriptPath, [], {
+    env: {},
+    cwd: "/tmp",
+    stdio: ["ignore", "inherit", "inherit"]
+  });
+
+  console.log("installed");
+
+  return {};
+}
+
+function run(binary, args) {
+  const proc = cp.spawn(binary, args, { stdio: "inherit" });
+  return new Promise((resolve, reject) => {
+    proc.once("exit", code => {
+      if (code != 0) {
+        reject(
+          new Error(
+            `process ${proc.pid} with args (${args.join(
+              " "
+            )}) has quit with non-zero exit code. ${code}`
+          )
+        );
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 async function getAllFunctions(HOST) {

@@ -1,0 +1,60 @@
+# API KEY
+apiVersion: passport/v1
+kind: ApiKey
+metadata:
+  name: spica-to-asset-apikey
+spec:
+  name: Secret Api Key For Asset Of Spica To Asset
+  policies:
+    - FunctionFullAccess
+    - BucketReadOnlyAccess
+---
+# FUNCTION - Convert Asset
+apiVersion: function/v1
+kind: Function
+metadata:
+  name: convert-asset
+spec:
+  description: Convert yoour spica to an asset
+  language: javascript
+  timeout: 180
+  title: Spica To Asset
+  code: ./function/spicatoasset.js
+  runtime:
+    name: Node
+    language: Javascript
+  environment:
+    - name: API_KEY
+      valueFrom:
+        resourceFieldRef:
+          apiKeyName: spica-to-asset-apikey
+    - name: GIT_USERNAME
+      value: ""
+    - name: GIT_EMAIL
+      value: ""
+    - name: GIT_PASSWORD
+      value: ""
+    - name: GIT_URL
+      value: ""
+    - name: _IGNORE_
+      value: "Dont't remove this environment !"
+  dependency:
+    - name: "@spica-devkit/bucket"
+      version: ^0.8.8
+    - name: json2csv
+      version: ^5.0.6
+---
+# TRIGGER - convertAsset
+apiVersion: function/v1
+kind: Trigger
+metadata:
+  name: convertAsset
+spec:
+  type: http
+  active: true
+  name: convertAsset
+  func: convert-asset
+  httpOptions:
+    method: Get
+    path: /convertAsset
+    preflight: tr
