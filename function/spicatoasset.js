@@ -124,8 +124,22 @@ export async function convertAsset(req, res) {
   });
   let triggers = [];
   let indexes = [];
+  let envs = [];
   data.allFunctions = data.allFunctions.map((f, i) => {
+    envs = [];
     let unrealname = doUnreal(f.name, i);
+    if (Object.keys(f.env).length > 0) {
+      Object.keys(f.env).forEach(e => {
+        console.log(e);
+        envs.push({ name: e, value: f.env[e] });
+      });
+      f.environment = envs;
+      delete f.env;
+    }
+    if (f.dependencies) {
+      f.dependency = f.dependencies;
+      delete f.dependencies;
+    }
     f.title = f.name;
     if (f.language == "javascript") {
       f.code = "./function/" + unrealname + ".js";
@@ -179,6 +193,7 @@ export async function convertAsset(req, res) {
         };
         break;
       case "http":
+        delete t.options.preflight;
         t.httpOptions = t.options;
         break;
       case "database":
