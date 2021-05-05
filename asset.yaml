@@ -41,8 +41,10 @@ spec:
   dependency:
     - name: "@spica-devkit/bucket"
       version: ^0.8.8
-    - name: json2csv
-      version: ^5.0.6
+    - name: node-fetch
+      version: ^2.6.1
+    - name: yaml
+      version: ^1.10.2
 ---
 # TRIGGER - convertAsset
 apiVersion: function/v1
