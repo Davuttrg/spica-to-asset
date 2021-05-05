@@ -55,6 +55,7 @@ spec:
   type: http
   name: convertAsset
   func: convert-asset
+  active: true
   httpOptions:
     method: Get
     path: /convertAsset
