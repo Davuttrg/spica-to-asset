@@ -278,7 +278,7 @@ export async function convertAsset(req, res) {
   fs.writeFileSync(__dirname + yamlPath, yamlString);
   let funcPath;
   const funcDir = "./tmp/repo/function";
-  if (indexes.lenght > 0 && !fs.existsSync(funcDir)) {
+  if (!fs.existsSync(funcDir)) {
     fs.mkdirSync(funcDir);
   }
   for (let funcIndex of indexes) {
