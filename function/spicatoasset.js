@@ -138,9 +138,9 @@ export async function convertAsset(req, res) {
       delete f.env;
     }
     if (isIgnore) {
-      data.allFunctions.splice(i, 1)
+      data.allFunctions.splice(i, 1);
       isIgnore = false;
-      return
+      return;
     }
     if (f.dependencies) {
       f.dependency = f.dependencies;
@@ -221,8 +221,8 @@ export async function convertAsset(req, res) {
   if (dubRelation) return res.status(400).send({ message: "Cross relation error !" });
 
   /***********************GIT************************/
-
   await run("rm", ["-rf", "tmp/repo"]).catch(e => console.log("e :", e));
+
   await installGit();
 
   cp.execSync(`git config --global http.sslverify false`, {
@@ -273,7 +273,6 @@ export async function convertAsset(req, res) {
       console.log(`git remote set-url stdout:\n${stdout}`);
     }
   );
-
   const yamlPath = path.join("/tmp/repo", "asset.yaml");
   fs.writeFileSync(__dirname + yamlPath, yamlString);
   let funcPath;
@@ -323,17 +322,26 @@ export async function convertAsset(req, res) {
       console.log(`git push stdout:\n${stdout}`);
     }
   );
+  cp.exec("rm -rf tmp/repo/.git/*.lock", (error, stdout, stderr) => {
+    if (error) {
+      console.error(`git remove index error: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`git remove index stderr: ${stderr}`);
+      return;
+    }
+    console.log(`git remove index stdout:\n${stdout}`);
+  });
   /***********************GIT************************/
-
   return { yamlString };
 }
-
 async function installGit() {
   console.log("INSTALLATION GIT START");
   const script = `
-    apt update -y
-    apt install npm -y
-    apt install git -y`;
+    apt-get update -y
+    apt-get install npm -y
+    apt-get install git -y`;
 
   const scriptPath = "/tmp/installDependencies.sh";
   fs.writeFileSync(scriptPath, script);
