@@ -212,7 +212,7 @@ export async function convertAsset(req, res) {
     yamlString += "# TRIGGER - " + t.spec.name + "\n" + YAML.stringify(t) + "---\n";
     return t;
   });
-  yamlString = yamlString.substring(0, yamlString.length - 7);
+  yamlString = yamlString.substring(0, yamlString.length - 5);
   if (dubRelation) return res.status(400).send({ message: "Cross relation error !" });
 
   /***********************GIT************************/
@@ -277,7 +277,7 @@ export async function convertAsset(req, res) {
     fs.mkdirSync(funcDir);
   }
   for (let funcIndex of indexes) {
-    funcPath = path.join("/tmp/repo/functions", funcIndex.func);
+    funcPath = path.join("/tmp/repo/function", funcIndex.func);
     fs.writeFileSync(__dirname + funcPath, funcIndex.index);
   }
 
