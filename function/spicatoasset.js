@@ -1,3 +1,27 @@
+/***********************************************************************
+
+What can this asset do?
+
+  -You can create an asset from your spica instance
+  -If you want, you can upload this asset to the assetstore and let everyone use it
+
+PROCESS * 
+ - Will clone the address of an empty repository you created on git
+ - Your project will be converted into an asset and sent to your repository
+
+NOTES * 
+
+ -Remember to set environment variables first (Don't remove _IGNORE_ variable)
+ -If you want to run it a second time, first clean your repository
+
+
+
+/************************************************************************/
+
+
+
+
+
 import * as Bucket from "@spica-devkit/bucket";
 const fetch = require("node-fetch");
 var YAML = require("yaml");
