@@ -15,7 +15,7 @@ kind: Function
 metadata:
   name: convert-asset
 spec:
-  description: Convert yoour spica to an asset
+  description: Convert your spica to an asset
   language: javascript
   timeout: 180
   title: Spica To Asset
