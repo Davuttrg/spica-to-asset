@@ -292,7 +292,7 @@ export async function convertAsset(req, res) {
     }
     console.log(`git add stdout:\n${stdout}`);
   });
-  cp.exec("git commit -m 'dvt-5'", { cwd: __dirname + "/tmp/repo" }, (error, stdout, stderr) => {
+  cp.exec("git commit -m 'spica'", { cwd: __dirname + "/tmp/repo" }, (error, stdout, stderr) => {
     if (error) {
       console.error(`git commit error: ${error.message}`);
       return;
