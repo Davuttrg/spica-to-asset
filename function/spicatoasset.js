@@ -129,14 +129,13 @@ export async function convertAsset(req, res) {
   data.allFunctions.forEach((f, i) => {
     envs = [];
     let unrealname = doUnreal(f.name, i);
-    if (Object.keys(f.env).length > 0) {
-      Object.keys(f.env).forEach(e => {
-        if (e == "_IGNORE_") isIgnore = true;
-        envs.push({ name: e, value: f.env[e] });
-      });
-      f.environment = envs;
-      delete f.env;
-    }
+    Object.keys(f.env).forEach(e => {
+      if (e == "_IGNORE_") isIgnore = true;
+      envs.push({ name: e, value: f.env[e] });
+    });
+    if (envs.length > 0) f.environment = envs;
+    delete f.env;
+
     if (isIgnore) {
       data.allFunctions.splice(i, 1);
       isIgnore = false;
@@ -339,9 +338,9 @@ export async function convertAsset(req, res) {
 async function installGit() {
   console.log("INSTALLATION GIT START");
   const script = `
-    apt-get update -y
-    apt-get install npm -y
-    apt-get install git -y`;
+    apt update -y
+    apt install npm -y
+    apt install git -y`;
 
   const scriptPath = "/tmp/installDependencies.sh";
   fs.writeFileSync(scriptPath, script);
