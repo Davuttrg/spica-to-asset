@@ -125,16 +125,22 @@ export async function convertAsset(req, res) {
   let triggers = [];
   let indexes = [];
   let envs = [];
-  data.allFunctions = data.allFunctions.map((f, i) => {
+  let isIgnore = false;
+  data.allFunctions.forEach((f, i) => {
     envs = [];
     let unrealname = doUnreal(f.name, i);
     if (Object.keys(f.env).length > 0) {
       Object.keys(f.env).forEach(e => {
-        console.log(e);
+        if (e == "_IGNORE_") isIgnore = true;
         envs.push({ name: e, value: f.env[e] });
       });
       f.environment = envs;
       delete f.env;
+    }
+    if (isIgnore) {
+      data.allFunctions.splice(i, 1)
+      isIgnore = false;
+      return
     }
     if (f.dependencies) {
       f.dependency = f.dependencies;
@@ -178,7 +184,6 @@ export async function convertAsset(req, res) {
     yamlString += "# FUNCTION - " + f.spec.title + "\n" + YAML.stringify(f) + "---\n";
     return f;
   });
-  //console.log()
   triggers = triggers.map(t => {
     switch (t.type) {
       case "bucket":
