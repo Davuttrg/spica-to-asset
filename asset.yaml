@@ -17,7 +17,7 @@ metadata:
 spec:
   description: Convert your spica to an asset
   language: javascript
-  timeout: 120
+  timeout: 200
   title: Spica To Asset
   code: ./function/spicatoasset.js
   runtime:

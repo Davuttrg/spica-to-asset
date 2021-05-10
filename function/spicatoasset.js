@@ -12,10 +12,17 @@ PROCESS *
 NOTES * 
 
  -Remember to set environment variables first (Don't remove _IGNORE_ variable)
- -If you want to run it a second time, first clean your repository
+ -If you want to run it a second time, first clean your repository 
+ -You must raise the function maximum timeout up to 300 seconds from the Hq dashboard panel (advance settings)
 
 
+OPTIONAL PARAMS *
 
+  If you don't want to all buckets or all functions , you can give parameters the body in this way
+  - {
+    "unwanted_buckets": "bucket_id,bucket_id",
+    "unwanted_functions": "function_id"
+    }
 /************************************************************************/
 
 
@@ -36,6 +43,7 @@ const GIT_URL = process.env.GIT_URL;
 
 export async function convertAsset(req, res) {
   Bucket.initialize({ apikey: `${process.env.API_KEY}` });
+  const { unwanted_buckets, unwanted_function } = req.body
   const HOST = req.headers.get("host");
   /////////--------------Get Schemas-----------------////////////
   let schemas = await Bucket.getAll().catch(error =>
@@ -69,9 +77,21 @@ export async function convertAsset(req, res) {
 
   let yamlString = "";
   let schemaFindArr = [];
-  data.schemas.forEach((s, i) => {
+  data.schemas = data.schemas.filter((s, i) => {
     setUnrealArray(s, i);
+    if (unwanted_buckets) {
+      return !unwanted_buckets.includes(s._id);
+    }
+    return true;
   });
+  if (unwanted_functions) {
+    data.allFunctions = data.allFunctions.filter(f => {
+      if (unwanted_functions) {
+        return !unwanted_functions.includes(f._id);
+      }
+      return true;
+    });
+  }
   let dubRelation = false;
 
   let changeObj = [];
@@ -362,9 +382,10 @@ export async function convertAsset(req, res) {
 async function installGit() {
   console.log("INSTALLATION GIT START");
   const script = `
-    apt update -y
-    apt install npm -y
-    apt install git -y`;
+  apt-get update -y,
+  apt-get install -y
+  apt install npm -y
+  apt install git -y`;
 
   const scriptPath = "/tmp/installDependencies.sh";
   fs.writeFileSync(scriptPath, script);
