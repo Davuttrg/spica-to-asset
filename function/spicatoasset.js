@@ -11,7 +11,7 @@ PROCESS *
 
 NOTES * 
 
- -Remember to set environment variables first (Don't remove _IGNORE_ variable)
+ -Remember to set environment variables first (Don't remove _IGNORE_ variable, because this function will be ignored when conversion)
  -If you want to run it a second time, first clean your repository 
  -You must raise the function maximum timeout up to 300 seconds from the Hq dashboard panel (advance settings)
 
@@ -43,7 +43,7 @@ const GIT_URL = process.env.GIT_URL;
 
 export async function convertAsset(req, res) {
   Bucket.initialize({ apikey: `${process.env.API_KEY}` });
-  const { unwanted_buckets, unwanted_function } = req.body
+  const { unwanted_buckets, unwanted_functions } = req.body
   const HOST = req.headers.get("host");
   /////////--------------Get Schemas-----------------////////////
   let schemas = await Bucket.getAll().catch(error =>
@@ -381,11 +381,10 @@ export async function convertAsset(req, res) {
 }
 async function installGit() {
   console.log("INSTALLATION GIT START");
-  const script = `
-  apt-get update -y,
+  const script = `apt-get update -y
   apt-get install -y
-  apt install npm -y
-  apt install git -y`;
+  apt-get install npm -y
+  apt-get install git -y`;
 
   const scriptPath = "/tmp/installDependencies.sh";
   fs.writeFileSync(scriptPath, script);
