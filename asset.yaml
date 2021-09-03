@@ -32,9 +32,11 @@ spec:
       value: ""
     - name: GIT_EMAIL
       value: ""
-    - name: GIT_PASSWORD
+    - name: GIT_REPO_NAME
       value: ""
     - name: GIT_URL
+      value: ""
+    - name: GIT_ACCESS_TOKEN
       value: ""
     - name: _IGNORE_
       value: "Dont't remove this environment !"

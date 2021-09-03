@@ -34,17 +34,13 @@ import * as path from "path";
 
 let GIT_USERNAME = process.env.GIT_USERNAME;
 let GIT_EMAIL = process.env.GIT_EMAIL;
-let GIT_PASSWORD = process.env.GIT_PASSWORD;
+let GIT_REPO_NAME = process.env.GIT_REPO_NAME;
+let GIT_ACCESS_TOKEN = process.env.GIT_ACCESS_TOKEN;
 let GIT_URL = process.env.GIT_URL;
 
 export async function convertAsset(req, res) {
     Bucket.initialize({ apikey: `${process.env.API_KEY}` });
     const { unwanted_buckets, unwanted_functions } = req.body;
-
-    GIT_USERNAME = req.body.git_username;
-    GIT_EMAIL = req.body.git_email;
-    GIT_PASSWORD = req.body.git_password;
-    GIT_URL = req.body.git_url;
 
     const HOST = req.headers.get("host");
     /////////--------------Get Schemas-----------------////////////
@@ -274,7 +270,7 @@ export async function convertAsset(req, res) {
     /***********************GIT************************/
     await run("rm", ["-rf", "tmp/repo"]).catch(e => console.log("e :", e));
 
-    // await installGit();
+    await installGit();
 
     cp.execSync(`git config --global http.sslverify false`, {
         stdio: ["ignore", "ignore", "inherit"]
@@ -309,8 +305,23 @@ export async function convertAsset(req, res) {
         });
 
     cp.exec(
-        `git remote set-url origin  https://${GIT_USERNAME}:${GIT_PASSWORD}@` +
-            GIT_URL.split("https://")[1],
+        `git remote add origin https://${GIT_ACCESS_TOKEN}@github.com/${GIT_USERNAME}/${GIT_REPO_NAME}`,
+        { cwd: __dirname + "/tmp/repo" },
+        (error, stdout, stderr) => {
+            if (error) {
+                console.error(`git remote add origin: ${error.message}`);
+                return;
+            }
+            if (stderr) {
+                console.error(`git remote set-url stderr: ${stderr}`);
+                return;
+            }
+            console.log(`git remote set-url stdout:\n${stdout}`);
+        }
+    );
+
+    cp.exec(
+        `git remote set-url origin https://${GIT_ACCESS_TOKEN}@github.com/${GIT_USERNAME}/${GIT_REPO_NAME}`,
         { cwd: __dirname + "/tmp/repo" },
         (error, stdout, stderr) => {
             if (error) {
@@ -389,10 +400,8 @@ export async function convertAsset(req, res) {
 }
 async function installGit() {
     console.log("INSTALLATION GIT START");
-    const script = `apt-get update -y
-  apt-get install -y
-  apt-get install npm -y
-  apt-get install git -y`;
+    const script = `apt-get update -y 
+    apt-get install git -y`;
 
     const scriptPath = "/tmp/installDependencies.sh";
     fs.writeFileSync(scriptPath, script);
