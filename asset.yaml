@@ -9,6 +9,19 @@ spec:
     - FunctionFullAccess
     - BucketReadOnlyAccess
 ---
+# SPICA TO ASSET
+apiVersion: dashboard/v1
+kind: Dashboard
+metadata:
+  name: spica-to-asset
+spec:
+  name: Spica To Asset
+  icon: settings_ethernet
+  components:
+    - name: convert
+      url: api:/fn-execute/spicaToAssetDahsboard
+      type: card
+---
 # FUNCTION - Convert Asset
 apiVersion: function/v1
 kind: Function
@@ -28,23 +41,15 @@ spec:
       valueFrom:
         resourceFieldRef:
           apiKeyName: spica-to-asset-apikey
-    - name: GIT_USERNAME
-      value: ""
-    - name: GIT_EMAIL
-      value: ""
-    - name: GIT_REPO_NAME
-      value: ""
-    - name: GIT_URL
-      value: ""
-    - name: GIT_ACCESS_TOKEN
-      value: ""
     - name: _IGNORE_
       value: "Dont't remove this environment !"
   dependency:
     - name: "@spica-devkit/bucket"
-      version: ^0.8.8
+      version: ^0.9.11
+    - name: "@spica-devkit/database"
+      version: ^0.9.11
     - name: node-fetch
-      version: ^2.6.1
+      version: ^3.0.0
     - name: yaml
       version: ^1.10.2
 ---
@@ -61,3 +66,17 @@ spec:
   httpOptions:
     method: Post
     path: /convertAsset
+---
+# TRIGGER - spicaToAssetDahsboard
+apiVersion: function/v1
+kind: Trigger
+metadata:
+  name: spicaToAssetDahsboard
+spec:
+  type: http
+  name: spicaToAssetDahsboard
+  func: convert-asset
+  active: true
+  httpOptions:
+    method: Get
+    path: /spicaToAssetDahsboard

@@ -26,21 +26,31 @@ OPTIONAL PARAMS *
 /************************************************************************/
 
 import * as Bucket from "@spica-devkit/bucket";
-const fetch = require("node-fetch");
+import { database, ObjectId } from "@spica-devkit/database";
+
+import fetch from 'node-fetch';
 var YAML = require("yaml");
 import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 
-let GIT_USERNAME = process.env.GIT_USERNAME;
-let GIT_EMAIL = process.env.GIT_EMAIL;
-let GIT_REPO_NAME = process.env.GIT_REPO_NAME;
-let GIT_ACCESS_TOKEN = process.env.GIT_ACCESS_TOKEN;
-let GIT_URL = process.env.GIT_URL;
+const PUBLIC_URL = process.env.__INTERNAL__SPICA__PUBLIC_URL__;
 
 export async function convertAsset(req, res) {
     Bucket.initialize({ apikey: `${process.env.API_KEY}` });
-    const { unwanted_buckets, unwanted_functions } = req.body;
+    const { git_username, git_email, git_repo_name, git_url, git_access_token, ignored_buckets, ignored_functions } = req.body;
+
+    let GIT_USERNAME = git_username;
+    let GIT_EMAIL = git_email;
+    let GIT_REPO_NAME = git_repo_name;
+    let GIT_ACCESS_TOKEN = git_access_token;
+    let GIT_URL = git_url;
+
+    let buckets_arr = ignored_buckets.split(",");
+    let functions_arr = ignored_functions.split(",");
+
+    let bucketIsd = formatData(buckets_arr)
+    let functionIsd = formatData(functions_arr)
 
     const HOST = req.headers.get("host");
     /////////--------------Get Schemas-----------------////////////
@@ -77,22 +87,22 @@ export async function convertAsset(req, res) {
     let schemaFindArr = [];
     data.schemas = data.schemas.filter((s, i) => {
         setUnrealArray(s, i);
-        if (unwanted_buckets) {
-            return !unwanted_buckets.includes(s._id);
+        if (bucketIsd) {
+            return !bucketIsd.includes(s._id);
         }
         return true;
     });
-    if (unwanted_functions) {
+    if (functionIsd) {
         data.allFunctions = data.allFunctions.filter(f => {
-            if (unwanted_functions) {
-                return !unwanted_functions.includes(f._id);
+            if (functionIsd) {
+                return !functionIsd.includes(f._id);
             }
             return true;
         });
     }
-    let dubRelation = false;
-
     let changeObj = [];
+    let priorityBuckets = [];
+
     data.schemas = data.schemas.map((s, i) => {
         s = {
             apiVersion: "bucket/v1",
@@ -102,39 +112,51 @@ export async function convertAsset(req, res) {
             },
             spec: s
         };
-        Object.keys(s.spec.properties).forEach(p => {
-            delete s.spec.properties[p].title;
-            if (s.spec.properties[p].type == "relation") {
-                let indexLast = s.metadata.name;
-                let indexFirst = schemaFindArr.filter(
-                    fs => fs._id == s.spec.properties[p].bucketId
-                )[0].unrealName;
-                if (!changeObj.some(o => o.last == indexLast && o.first == indexFirst)) {
-                    changeObj.push({ last: indexLast, first: indexFirst });
-                    if (
-                        changeObj.some(o => o.last == indexFirst && o.first == indexLast) &&
-                        !dubRelation
-                    ) {
-                        dubRelation = true;
+
+        findRelation(s.spec.properties);
+        function findRelation(props) {
+            Object.keys(props).forEach((p) => {
+                if (props[p].type == 'relation') {
+                    let indexLast = s.metadata.name;
+                    let indexFirst = schemaFindArr.filter(
+                        fs => fs._id == props[p].bucketId
+                    )[0].unrealName;
+
+                    if (!changeObj.some(o => o.last == indexLast && o.first == indexFirst)) {
+                        changeObj.push({ last: indexLast, first: indexFirst });
+                        if (
+                            changeObj.some(o => o.last == indexFirst && o.first == indexLast)
+                        ) {
+                            priorityBuckets.push(indexLast)
+                        }
                     }
+                    props[p].bucket = {
+                        resourceFieldRef: {
+                            schemaName: schemaFindArr.filter(
+                                f => f._id == props[p].bucketId
+                            )[0].unrealName
+                        }
+                    };
+                    delete props[p].bucketId;
+                    // console.log('relation :', props[p]);
                 }
-                s.spec.properties[p].bucket = {
-                    resourceFieldRef: {
-                        schemaName: schemaFindArr.filter(
-                            f => f._id == s.spec.properties[p].bucketId
-                        )[0].unrealName
-                    }
-                };
-                delete s.spec.properties[p].bucketId;
-            }
-        });
+                if (props[p].type == 'object') {
+                    findRelation(props[p].properties);
+                }
+                if (props[p].type == 'array') {
+                    findRelation(props[p]);
+                }
+            });
+        }
+
         delete s.spec._id;
-        //  delete s.spec.title
         return s;
     });
+
     changeObj.forEach(c => {
         let firstIndex = data.schemas.findIndex(f => f.metadata.name == c.first);
         let lastIndex = data.schemas.findIndex(f => f.metadata.name == c.last);
+
         if (firstIndex > lastIndex) {
             let temp = data.schemas.splice(firstIndex, 1);
             data.schemas.unshift(temp[0]);
@@ -151,7 +173,6 @@ export async function convertAsset(req, res) {
     }
 
     function doUnreal(word, i) {
-        // console.log(word);
         word =
             word
                 .trim()
@@ -161,17 +182,33 @@ export async function convertAsset(req, res) {
             (i + 1);
         return word;
     }
+
+    if (priorityBuckets.length) {
+        priorityBuckets.forEach((bucket) => {
+            let tempObj = data.schemas.find(f => { return f.metadata.name == bucket })
+            let temp = JSON.parse(JSON.stringify(tempObj))
+
+            Object.keys(temp.spec.properties).forEach(p => {
+                if (temp.spec.properties[p].type == "relation") {
+                    delete temp.spec.properties[p]
+                }
+            })
+
+            data.schemas.unshift(temp)
+        })
+    }
+
     data.schemas.forEach(s => {
         yamlString += "# BUCKET - " + s.spec.title + "\n" + YAML.stringify(s) + "---\n";
     });
+
     let triggers = [];
     let indexes = [];
     let envs = [];
     let isIgnore = false;
     let willSpliceIndex;
-    // console.log(JSON.stringify(data.allFunctions, null, 4));
+
     data.allFunctions.forEach((f, i) => {
-        console.log(JSON.stringify(f, null, 4));
         envs = [];
         let unrealname = doUnreal(f.name, i);
         Object.keys(f.env).forEach(e => {
@@ -265,11 +302,9 @@ export async function convertAsset(req, res) {
         return t;
     });
     yamlString = yamlString.substring(0, yamlString.length - 5);
-    if (dubRelation) return res.status(400).send({ message: "Cross relation error !" });
 
     /***********************GIT************************/
     await run("rm", ["-rf", "tmp/repo"]).catch(e => console.log("e :", e));
-
     await installGit();
 
     cp.execSync(`git config --global http.sslverify false`, {
@@ -295,7 +330,7 @@ export async function convertAsset(req, res) {
     });
 
     await run("git", ["clone", `${GIT_URL}`, "tmp/repo"])
-        .then(() => {})
+        .then(() => { })
         .catch(error => {
             console.log("error : ", error);
             res.status(400).send({
@@ -399,22 +434,51 @@ export async function convertAsset(req, res) {
     return { yamlString };
 }
 async function installGit() {
-    console.log("INSTALLATION GIT START");
-    const script = `apt-get update -y 
+    const scriptPath = "/tmp/installDependencies.sh";
+
+    // const scriptDelete = `
+    // rm /var/lib/apt/lists/lock
+    // rm /var/cache/apt/archives/lock
+    // rm /var/lib/dpkg/lock*
+    // dpkg --configure -a
+    // apt update
+    // apt-get remove git`;
+
+    const scriptInstall = `apt-get update -y 
     apt-get install git -y`;
 
-    const scriptPath = "/tmp/installDependencies.sh";
-    fs.writeFileSync(scriptPath, script);
+    console.log("INSTALLATION GIT START");
+
+    fs.writeFileSync(scriptPath, scriptInstall);
     fs.chmodSync(scriptPath, "755");
-    cp.spawnSync(scriptPath, [], {
+    cp.spawn(scriptPath, [], {
         env: {},
         cwd: "/tmp",
         stdio: ["ignore", "inherit", "inherit"]
     });
 
-    console.log("installed");
+    console.log("GIT INSTALLED");
 
     return {};
+}
+
+function formatData(data) {
+    let str = "";
+
+    for (let item of data) {
+        str += idParser(item) + ",";
+    }
+
+    if (str.length > 0) {
+        str = str.slice(0, -1);
+    }
+
+    return str;
+}
+
+function idParser(str) {
+    var n = str.split(" ");
+    return n[n.length - 1];
 }
 
 function run(binary, args) {
@@ -486,4 +550,89 @@ async function getDependencies(id, HOST) {
                 console.log("error : ", error);
             });
     });
+}
+
+export async function spicaToAssetDahsboard(req, res) {
+    Bucket.initialize({ apikey: `${process.env.API_KEY}` });
+    const [bucketIds] = await Bucket.getAll().then((buckets) =>
+        buckets.reduce(
+            (acc, curr) => {
+                acc[0].push(`${curr.title} ${curr._id}`);
+
+                return acc;
+            },
+            [[]]
+        )
+    );
+
+    let db = await database().catch(err => console.log("Error", err))
+    let functionCollection = db.collection('function')
+    let functionsData = await functionCollection.find().toArray().catch(err => console.log("Error", err))
+
+    functionsData = functionsData.map(fn => { return `${fn.name} ${fn._id}` })
+
+    return {
+        title: "Spica To Asset Dashboard",
+        description:
+            "Fill all fields to extract assets",
+        inputs: [
+            {
+                key: "git_username",
+                type: "string",
+                value: "",
+                title: "Git Username",
+            },
+            {
+                key: "git_email",
+                type: "string",
+                value: "",
+                title: "Git Email",
+            },
+            {
+                key: "git_repo_name",
+                type: "string",
+                value: "",
+                title: "Git Repo Name",
+            },
+            {
+                key: "git_url",
+                type: "string",
+                value: "",
+                title: "Git URL",
+            },
+            {
+                key: "git_access_token",
+                type: "string",
+                value: "",
+                title: "Git Access Token",
+            },
+            {
+                key: "ignored_buckets",
+                type: "multiselect",
+                items: {
+                    type: "string",
+                    enum: Array.from(new Set(bucketIds)),
+                },
+                value: null,
+                title: "Ignored Buckets",
+            },
+            {
+                key: "ignored_functions",
+                type: "multiselect",
+                items: {
+                    type: "string",
+                    enum: functionsData,
+                },
+                value: null,
+                title: "Ignored Functions",
+            },
+
+        ],
+        button: {
+            color: "primary",
+            target: `${PUBLIC_URL}/fn-execute/convertAsset`,
+            method: "post",
+            title: "Send Request",
+        },
+    };
 }
