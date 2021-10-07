@@ -71,13 +71,13 @@ export async function convertAsset(req, res) {
             })
             .catch(error => console.log("getIndexes error :", error));
         await getDependencies(fn._id, HOST)
-            .then(dependency => {
-                fn.dependencies = dependency;
+            .then(dependencies => {
+                dependencies.map((item) => { if (item.types) delete item.types; return item })
+                fn.dependencies = dependencies;
             })
             .catch(error => console.log("getDependencies error :", error));
     }
     /////////--------------Get Functions with dependencies and environments-----------------////////////
-
     let data = {
         schemas: schemas,
         allFunctions: allFunctions
@@ -85,6 +85,9 @@ export async function convertAsset(req, res) {
 
     let yamlString = "";
     let schemaFindArr = [];
+    let metadataNames = [];
+
+
     data.schemas = data.schemas.filter((s, i) => {
         setUnrealArray(s, i);
         if (bucketIsd) {
@@ -92,6 +95,10 @@ export async function convertAsset(req, res) {
         }
         return true;
     });
+
+    metadataNames = [];
+
+
     if (functionIsd) {
         data.allFunctions = data.allFunctions.filter(f => {
             if (functionIsd) {
@@ -100,10 +107,12 @@ export async function convertAsset(req, res) {
             return true;
         });
     }
-    let changeObj = [];
-    let priorityBuckets = [];
 
-    data.schemas = data.schemas.map((s, i) => {
+    let originalBuckets = [];
+    let withRelationBuckets = [];
+    let withoutRelationBuckets = [];
+
+    data.schemas.map((s, i) => {
         s = {
             apiVersion: "bucket/v1",
             kind: "Schema",
@@ -113,23 +122,13 @@ export async function convertAsset(req, res) {
             spec: s
         };
 
+        let relation = false;
+
         findRelation(s.spec.properties);
         function findRelation(props) {
             Object.keys(props).forEach((p) => {
                 if (props[p].type == 'relation') {
-                    let indexLast = s.metadata.name;
-                    let indexFirst = schemaFindArr.filter(
-                        fs => fs._id == props[p].bucketId
-                    )[0].unrealName;
-
-                    if (!changeObj.some(o => o.last == indexLast && o.first == indexFirst)) {
-                        changeObj.push({ last: indexLast, first: indexFirst });
-                        if (
-                            changeObj.some(o => o.last == indexFirst && o.first == indexLast)
-                        ) {
-                            priorityBuckets.push(indexLast)
-                        }
-                    }
+                    relation = true;
                     props[p].bucket = {
                         resourceFieldRef: {
                             schemaName: schemaFindArr.filter(
@@ -138,7 +137,6 @@ export async function convertAsset(req, res) {
                         }
                     };
                     delete props[p].bucketId;
-                    // console.log('relation :', props[p]);
                 }
                 if (props[p].type == 'object') {
                     findRelation(props[p].properties);
@@ -148,22 +146,38 @@ export async function convertAsset(req, res) {
                 }
             });
         }
-
         delete s.spec._id;
-        return s;
-    });
-
-    changeObj.forEach(c => {
-        let firstIndex = data.schemas.findIndex(f => f.metadata.name == c.first);
-        let lastIndex = data.schemas.findIndex(f => f.metadata.name == c.last);
-
-        if (firstIndex > lastIndex) {
-            let temp = data.schemas.splice(firstIndex, 1);
-            data.schemas.unshift(temp[0]);
+        originalBuckets.push(s)
+        if (relation) {
+            withRelationBuckets.push(s)
         }
     });
 
+    if (withRelationBuckets.length) {
+        let tempArr = JSON.parse(JSON.stringify(withRelationBuckets))
+        tempArr.forEach((bucket) => {
+            findRelation(bucket.spec.properties);
+            function findRelation(props) {
+                Object.keys(props).forEach((p) => {
+                    if (props[p] && props[p].type == 'relation') {
+                        delete props[p]
+                    }
+                    if (props[p] && props[p].type == 'object') {
+                        findRelation(props[p].properties);
+                    }
+                    if (props[p] && props[p].type == 'array') {
+                        findRelation(props[p]);
+                    }
+                });
+            }
+            withoutRelationBuckets.push(bucket)
+        })
+    }
+
+    data.schemas = withoutRelationBuckets.concat(originalBuckets);
+
     function setUnrealArray(s, i) {
+
         let data = {
             _id: s._id,
             unrealName: doUnreal(s.title, i),
@@ -177,25 +191,11 @@ export async function convertAsset(req, res) {
             word
                 .trim()
                 .replace(/ /g, "-")
-                .toLowerCase() +
-            "-" +
-            (i + 1);
+                .toLowerCase();
+        if (metadataNames.includes(word))
+            word += "-" + (i + 1);
+
         return word;
-    }
-
-    if (priorityBuckets.length) {
-        priorityBuckets.forEach((bucket) => {
-            let tempObj = data.schemas.find(f => { return f.metadata.name == bucket })
-            let temp = JSON.parse(JSON.stringify(tempObj))
-
-            Object.keys(temp.spec.properties).forEach(p => {
-                if (temp.spec.properties[p].type == "relation") {
-                    delete temp.spec.properties[p]
-                }
-            })
-
-            data.schemas.unshift(temp)
-        })
     }
 
     data.schemas.forEach(s => {
@@ -211,6 +211,8 @@ export async function convertAsset(req, res) {
     data.allFunctions.forEach((f, i) => {
         envs = [];
         let unrealname = doUnreal(f.name, i);
+        metadataNames.push(unrealname)
+
         Object.keys(f.env).forEach(e => {
             if (e == "_IGNORE_") isIgnore = true;
             envs.push({ name: e, value: f.env[e] });
