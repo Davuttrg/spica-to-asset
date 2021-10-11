@@ -291,6 +291,15 @@ export async function convertAsset(req, res) {
             case "database":
                 t.databaseOptions = t.options;
                 break;
+            case "schedule":
+                t.scheduleOptions = t.options;
+                break;
+            case "system":
+                t.systemOptions = t.options;
+                break;
+            case "firehose":
+                t.firehoseOptions = t.options;
+                break;
         }
         t = {
             apiVersion: "function/v1",
