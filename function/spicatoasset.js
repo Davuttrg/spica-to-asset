@@ -52,7 +52,6 @@ export async function convertAsset(req, res) {
     let bucketIsd = formatData(buckets_arr)
     let functionIsd = formatData(functions_arr)
 
-    const HOST = req.headers.get("host");
     /////////--------------Get Schemas-----------------////////////
     let schemas = await Bucket.getAll().catch(error =>
         console.log("get allBuckets error :", error)
@@ -60,17 +59,17 @@ export async function convertAsset(req, res) {
     /////////--------------Get Schemas-----------------////////////
 
     /////////--------------Get Functions with dependencies and environments-----------------////////////
-    let allFunctions = await getAllFunctions(HOST).catch(error =>
+    let allFunctions = await getAllFunctions().catch(error =>
         console.log("get allfunctions error :", error)
     );
 
     for (const fn of allFunctions) {
-        await getIndexes(fn._id, HOST)
+        await getIndexes(fn._id)
             .then(indexData => {
                 fn.index = indexData.index;
             })
             .catch(error => console.log("getIndexes error :", error));
-        await getDependencies(fn._id, HOST)
+        await getDependencies(fn._id)
             .then(dependencies => {
                 dependencies.map((item) => { if (item.types) delete item.types; return item })
                 fn.dependencies = dependencies;
@@ -117,7 +116,7 @@ export async function convertAsset(req, res) {
             apiVersion: "bucket/v1",
             kind: "Schema",
             metadata: {
-                name: doUnreal(s.title, i)
+                name: doUnreal(s.title, i, 'bucket')
             },
             spec: s
         };
@@ -180,20 +179,23 @@ export async function convertAsset(req, res) {
 
         let data = {
             _id: s._id,
-            unrealName: doUnreal(s.title, i),
+            unrealName: doUnreal(s.title, i, 'bucket'),
             realName: s.title
         };
         schemaFindArr.push(data);
     }
 
-    function doUnreal(word, i) {
+    function doUnreal(word, i, type) {
         word =
             word
                 .trim()
                 .replace(/ /g, "-")
                 .toLowerCase();
-        if (metadataNames.includes(word))
-            word += "-" + (i + 1);
+        if (metadataNames.includes(word)) {
+            word += "-" + (i + 1) + `-${type}`
+        } else {
+            word += `-${type}`
+        }
 
         return word;
     }
@@ -210,7 +212,7 @@ export async function convertAsset(req, res) {
 
     data.allFunctions.forEach((f, i) => {
         envs = [];
-        let unrealname = doUnreal(f.name, i);
+        let unrealname = doUnreal(f.name, i, 'function');
         metadataNames.push(unrealname)
 
         Object.keys(f.env).forEach(e => {
@@ -219,7 +221,6 @@ export async function convertAsset(req, res) {
         });
         if (envs.length > 0) f.environment = envs;
         delete f.env;
-        console.log("isIgnore", isIgnore, f.name);
         if (isIgnore) {
             willSpliceIndex = i;
             isIgnore = false;
@@ -502,9 +503,9 @@ function run(binary, args) {
     });
 }
 
-async function getAllFunctions(HOST) {
+async function getAllFunctions() {
     return new Promise(async (resolve, reject) => {
-        await fetch(`https://${HOST}/api/function/`, {
+        await fetch(`${PUBLIC_URL}/function/`, {
             headers: {
                 Authorization: `APIKEY ${process.env.API_KEY}`
             }
@@ -519,9 +520,9 @@ async function getAllFunctions(HOST) {
             });
     });
 }
-async function getIndexes(id, HOST) {
+async function getIndexes(id) {
     return new Promise(async (resolve, reject) => {
-        await fetch(`https://${HOST}/api/function/${id}/index`, {
+        await fetch(`${PUBLIC_URL}/function/${id}/index`, {
             headers: {
                 Authorization: `APIKEY ${process.env.API_KEY}`
             }
@@ -536,9 +537,9 @@ async function getIndexes(id, HOST) {
             });
     });
 }
-async function getDependencies(id, HOST) {
+async function getDependencies(id) {
     return new Promise(async (resolve, reject) => {
-        await fetch(`https://${HOST}/api/function/${id}/dependencies`, {
+        await fetch(`${PUBLIC_URL}/function/${id}/dependencies`, {
             headers: {
                 Authorization: `APIKEY ${process.env.API_KEY}`
             }
