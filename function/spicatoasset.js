@@ -49,8 +49,8 @@ export async function convertAsset(req, res) {
     let buckets_arr = ignored_buckets.split(",");
     let functions_arr = ignored_functions.split(",");
 
-    let bucketIsd = formatData(buckets_arr)
-    let functionIsd = formatData(functions_arr)
+    let bucketIds = formatData(buckets_arr)
+    let functionIds = formatData(functions_arr)
 
     /////////--------------Get Schemas-----------------////////////
     let schemas = await Bucket.getAll().catch(error =>
@@ -89,8 +89,8 @@ export async function convertAsset(req, res) {
 
     data.schemas = data.schemas.filter((s, i) => {
         setUnrealArray(s, i);
-        if (bucketIsd) {
-            return !bucketIsd.includes(s._id);
+        if (bucketIds) {
+            return !bucketIds.includes(s._id);
         }
         return true;
     });
@@ -98,10 +98,10 @@ export async function convertAsset(req, res) {
     metadataNames = [];
 
 
-    if (functionIsd) {
+    if (functionIds) {
         data.allFunctions = data.allFunctions.filter(f => {
-            if (functionIsd) {
-                return !functionIsd.includes(f._id);
+            if (functionIds) {
+                return !functionIds.includes(f._id);
             }
             return true;
         });
@@ -317,8 +317,7 @@ export async function convertAsset(req, res) {
 
     /***********************GIT************************/
     await run("rm", ["-rf", "tmp/repo"]).catch(e => console.log("e :", e));
-    await installGit();
-
+    
     cp.execSync(`git config --global http.sslverify false`, {
         stdio: ["ignore", "ignore", "inherit"]
     });
@@ -565,6 +564,7 @@ async function getDependencies(id) {
 }
 
 export async function spicaToAssetDahsboard(req, res) {
+    installGit();
     Bucket.initialize({ apikey: `${process.env.API_KEY}` });
     const [bucketIds] = await Bucket.getAll().then((buckets) =>
         buckets.reduce(
