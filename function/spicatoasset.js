@@ -63,6 +63,15 @@ export async function convertAsset(req, res) {
         console.log("get allfunctions error :", error)
     );
 
+    if (functionIds) {
+        allFunctions = allFunctions.filter(f => {
+            if (functionIds) {
+                return !functionIds.includes(f._id);
+            }
+            return true;
+        });
+    }
+
     for (const fn of allFunctions) {
         await getIndexes(fn._id)
             .then(indexData => {
@@ -86,7 +95,6 @@ export async function convertAsset(req, res) {
     let schemaFindArr = [];
     let metadataNames = [];
 
-
     data.schemas = data.schemas.filter((s, i) => {
         setUnrealArray(s, i);
         if (bucketIds) {
@@ -97,21 +105,11 @@ export async function convertAsset(req, res) {
 
     metadataNames = [];
 
-
-    if (functionIds) {
-        data.allFunctions = data.allFunctions.filter(f => {
-            if (functionIds) {
-                return !functionIds.includes(f._id);
-            }
-            return true;
-        });
-    }
-
     let originalBuckets = [];
     let withRelationBuckets = [];
     let withoutRelationBuckets = [];
 
-    data.schemas.map((s, i) => {
+    data.schemas = data.schemas.map((s, i) => {
         s = {
             apiVersion: "bucket/v1",
             kind: "Schema",
@@ -121,13 +119,10 @@ export async function convertAsset(req, res) {
             spec: s
         };
 
-        let relation = false;
-
         findRelation(s.spec.properties);
         function findRelation(props) {
             Object.keys(props).forEach((p) => {
                 if (props[p].type == 'relation') {
-                    relation = true;
                     props[p].bucket = {
                         resourceFieldRef: {
                             schemaName: schemaFindArr.filter(
@@ -146,34 +141,9 @@ export async function convertAsset(req, res) {
             });
         }
         delete s.spec._id;
-        originalBuckets.push(s)
-        if (relation) {
-            withRelationBuckets.push(s)
-        }
+        return s
+
     });
-
-    if (withRelationBuckets.length) {
-        let tempArr = JSON.parse(JSON.stringify(withRelationBuckets))
-        tempArr.forEach((bucket) => {
-            findRelation(bucket.spec.properties);
-            function findRelation(props) {
-                Object.keys(props).forEach((p) => {
-                    if (props[p] && props[p].type == 'relation') {
-                        delete props[p]
-                    }
-                    if (props[p] && props[p].type == 'object') {
-                        findRelation(props[p].properties);
-                    }
-                    if (props[p] && props[p].type == 'array') {
-                        findRelation(props[p]);
-                    }
-                });
-            }
-            withoutRelationBuckets.push(bucket)
-        })
-    }
-
-    data.schemas = withoutRelationBuckets.concat(originalBuckets);
 
     function setUnrealArray(s, i) {
 
@@ -317,7 +287,7 @@ export async function convertAsset(req, res) {
 
     /***********************GIT************************/
     await run("rm", ["-rf", "tmp/repo"]).catch(e => console.log("e :", e));
-    
+
     cp.execSync(`git config --global http.sslverify false`, {
         stdio: ["ignore", "ignore", "inherit"]
     });
