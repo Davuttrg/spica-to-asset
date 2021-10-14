@@ -103,6 +103,7 @@ export async function convertAsset(req, res) {
         return true;
     });
 
+
     metadataNames = [];
 
     let originalBuckets = [];
@@ -140,9 +141,9 @@ export async function convertAsset(req, res) {
                 }
             });
         }
+
         delete s.spec._id;
         return s
-
     });
 
     function setUnrealArray(s, i) {
@@ -415,15 +416,8 @@ export async function convertAsset(req, res) {
     return { yamlString };
 }
 async function installGit() {
+    
     const scriptPath = "/tmp/installDependencies.sh";
-
-    // const scriptDelete = `
-    // rm /var/lib/apt/lists/lock
-    // rm /var/cache/apt/archives/lock
-    // rm /var/lib/dpkg/lock*
-    // dpkg --configure -a
-    // apt update
-    // apt-get remove git`;
 
     const scriptInstall = `apt-get update -y 
     apt-get install git -y`;
