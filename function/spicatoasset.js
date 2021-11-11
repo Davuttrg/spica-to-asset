@@ -28,7 +28,7 @@ OPTIONAL PARAMS *
 import * as Bucket from "@spica-devkit/bucket";
 import { database, ObjectId } from "@spica-devkit/database";
 
-import fetch from 'node-fetch';
+const fetch = require('node-fetch');
 var YAML = require("yaml");
 import * as cp from "child_process";
 import * as fs from "fs";
