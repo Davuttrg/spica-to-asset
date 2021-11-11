@@ -168,7 +168,7 @@ export async function convertAsset(req, res) {
             word += `-${type}`
         }
 
-        return  GIT_REPO_NAME+word;
+        return  GIT_REPO_NAME+'-'+word;
     }
 
     data.schemas.forEach(s => {
