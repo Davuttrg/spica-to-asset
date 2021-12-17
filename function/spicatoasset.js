@@ -26,7 +26,7 @@ OPTIONAL PARAMS *
 /************************************************************************/
 
 import * as Bucket from "@spica-devkit/bucket";
-import { database, ObjectId } from "@spica-devkit/database";
+import { database } from "@spica-devkit/database";
 
 const fetch = require('node-fetch');
 var YAML = require("yaml");
@@ -105,10 +105,6 @@ export async function convertAsset(req, res) {
 
 
     metadataNames = [];
-
-    let originalBuckets = [];
-    let withRelationBuckets = [];
-    let withoutRelationBuckets = [];
 
     data.schemas = data.schemas.map((s, i) => {
         s = {
@@ -260,7 +256,15 @@ export async function convertAsset(req, res) {
                 t.httpOptions = t.options;
                 break;
             case "database":
-                t.databaseOptions = t.options;
+             t.databaseOptions = {
+                    collection: {
+                        resourceFieldRef: {
+                            schemaName: schemaFindArr.filter(s => s._id == t.options.bucket)[0]
+                                .unrealName
+                        }
+                    },
+                    type: t.options.type
+                };
                 break;
             case "schedule":
                 t.scheduleOptions = t.options;
