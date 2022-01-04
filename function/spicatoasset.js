@@ -256,10 +256,10 @@ export async function convertAsset(req, res) {
                 t.httpOptions = t.options;
                 break;
             case "database":
-             t.databaseOptions = {
+                t.databaseOptions = {
                     collection: {
                         resourceFieldRef: {
-                            schemaName: schemaFindArr.filter(s => s._id == t.options.bucket)[0]
+                            schemaName: schemaFindArr.filter(s => s._id == t.options.collection.split("bucket_")[1])[0]
                                 .unrealName
                         }
                     },
